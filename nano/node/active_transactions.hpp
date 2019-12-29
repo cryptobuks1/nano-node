@@ -63,6 +63,8 @@ public:
 // Holds all active blocks i.e. recently added blocks that need confirmation
 class active_transactions final
 {
+	friend class nano::election;
+
 	// clang-format off
 	class tag_account {};
 	class tag_difficulty {};

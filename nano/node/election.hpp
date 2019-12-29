@@ -51,6 +51,23 @@ public:
 class election final : public std::enable_shared_from_this<nano::election>
 {
 	std::function<void(std::shared_ptr<nano::block>)> confirmation_action;
+	
+private: // State management
+	enum class state_t
+	{
+		idle,
+		passive,
+		active,
+		backtracking,
+		confirmed,
+		expired
+	};
+	std::chrono::steady_clock::time_point state_start;
+	std::chrono::steady_clock::time_point last_confirm_req;
+	std::atomic<nano::election::state_t> state;
+	bool state_change (nano::election::state_t, nano::election::state_t);
+	void send_confirm_req ();
+	void activate_dependencies ();
 
 public:
 	election (nano::node &, std::shared_ptr<nano::block>, bool const, std::function<void(std::shared_ptr<nano::block>)> const &);
@@ -68,15 +85,14 @@ public:
 	void clear_dependent ();
 	void clear_blocks ();
 	void insert_inactive_votes_cache (nano::block_hash const &);
-	void stop ();
+	bool transition_time (nano::transaction &);
+	void start_passive ();
+	void start_active ();
 	nano::node & node;
 	std::unordered_map<nano::account, nano::vote_info> last_votes;
 	std::unordered_map<nano::block_hash, std::shared_ptr<nano::block>> blocks;
 	std::chrono::steady_clock::time_point election_start;
 	nano::election_status status;
-	bool skip_delay;
-	std::atomic<bool> confirmed;
-	bool stopped;
 	std::unordered_map<nano::block_hash, nano::uint128_t> last_tally;
 	unsigned confirmation_request_count{ 0 };
 	std::chrono::steady_clock::time_point last_broadcast;

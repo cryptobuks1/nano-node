@@ -11,12 +11,11 @@ nano::election_vote_result::election_vote_result (bool replay_a, bool processed_
 
 nano::election::election (nano::node & node_a, std::shared_ptr<nano::block> block_a, bool const skip_delay_a, std::function<void(std::shared_ptr<nano::block>)> const & confirmation_action_a) :
 confirmation_action (confirmation_action_a),
+state_start (std::chrono::steady_clock::now ()),
+last_confirm_req (std::chrono::steady_clock::time_point ()),
 node (node_a),
 election_start (std::chrono::steady_clock::now ()),
-status ({ block_a, 0, std::chrono::duration_cast<std::chrono::milliseconds> (std::chrono::system_clock::now ().time_since_epoch ()), std::chrono::duration_values<std::chrono::milliseconds>::zero (), 0, 1, 0, nano::election_status_type::ongoing }),
-skip_delay (skip_delay_a),
-confirmed (false),
-stopped (false)
+status ({ block_a, 0, std::chrono::duration_cast<std::chrono::milliseconds> (std::chrono::system_clock::now ().time_since_epoch ()), std::chrono::duration_values<std::chrono::milliseconds>::zero (), 0, 1, 0, nano::election_status_type::ongoing })
 {
 	last_votes.emplace (node.network_params.random.not_an_account, nano::vote_info{ std::chrono::steady_clock::now (), 0, block_a->hash () });
 	blocks.emplace (block_a->hash (), block_a);
@@ -26,7 +25,7 @@ stopped (false)
 void nano::election::confirm_once (nano::election_status_type type_a)
 {
 	assert (!node.active.mutex.try_lock ());
-	if (!confirmed.exchange (true))
+	if (state.exchange (nano::election::state_t::confirmed) != nano::election::state_t::confirmed)
 	{
 		status.election_end = std::chrono::duration_cast<std::chrono::milliseconds> (std::chrono::system_clock::now ().time_since_epoch ());
 		status.election_duration = std::chrono::duration_cast<std::chrono::milliseconds> (std::chrono::steady_clock::now () - election_start);
@@ -62,6 +61,79 @@ void nano::election::stop ()
 		status.voter_count = last_votes.size ();
 		status.type = nano::election_status_type::stopped;
 	}
+}
+
+bool nano::election::state_change (nano::election::state_t expected_a, nano::election::state desired_a)
+{
+	if (state.compare_exchange_strong (expected_a, desired_a))
+	{
+		state_start = std::chrono::steady_clock::now ();
+		return true;
+	}
+	return false;
+}
+
+void nano::election::send_confirm_req ()
+{
+	if (last_confirm_req + std::chrono::seconds (15) < std::chrono::steady_clock::now ())
+	{
+		last_confirm_req = std::chrono::steady_clock::now ();
+		node.active.solicitor.add (shared_from_this ());
+	}
+}
+
+void nano::election::start_passive ()
+{
+	assert (state == nano::election::state_t::idle);
+	state_change (nano::election::state_t::idle, nano::election::state_t::passive);
+}
+
+void nano::election::start_active ()
+{
+	assert (state == nano::election::state_t::idle);
+	state_change (nano::election::state_t::idle, nano::election::state_t::active);
+}
+
+bool nano::election::transition_time (nano::transaction & transaction_a)
+{
+	bool result = false;
+	if (election_start + std::chrono::minutes (5) < std::chrono::steady_clock::now ())
+	{
+		state = nano::election::state_t::expired;
+		status.type = nano::election_status_type::stopped;
+	}
+	switch (state)
+	{
+		case nano::election::state_t::idle:
+			break;
+		case nano::election::state_t::passive:
+			if (state_start + std::chrono::second (5) < std::chrono::steady_clock::now ())
+			{
+				state_change (nano::election::state_t::passive, nano::election::state_t::active);
+			}
+			break;
+		case nano::election::state_t::active:
+			send_confirm_req ();
+			if (state_start + std::chrono::seconds (60) < std::chrono::steady_clock::now ())
+			{
+				activate_dependencies ();
+				state_change (nano::election::state_t::active, nano::election::state_t::backtracking);
+			}
+			break;
+		case nano::election::state_t::backtracking:
+			send_confirm_req ();
+			break;
+		case nano::election::state_t::confirmed:
+			if (state_start + std::chrono::seconds (15) < std::chrono::steady_clock::now ())
+			{
+				state_change (nano::election::state_t::confirmed, nano::election::state_t::expired);
+			}
+			break;
+		case nano::election::state_t::expired:
+			result = true;
+			break;
+	}
+	return result;
 }
 
 bool nano::election::have_quorum (nano::tally_t const & tally_a, nano::uint128_t tally_sum) const
