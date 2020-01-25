@@ -124,9 +124,6 @@ public:
 	size_t inactive_votes_cache_size ();
 	std::unordered_map<nano::block_hash, std::shared_ptr<nano::election>> pending_conf_height;
 	void clear_block (nano::block_hash const & hash_a);
-	void add_dropped_elections_cache (nano::qualified_root const &);
-	std::chrono::steady_clock::time_point find_dropped_elections_cache (nano::qualified_root const &);
-	size_t dropped_elections_cache_size ();
 	nano::confirmation_solicitor solicitor;
 
 private:
@@ -183,15 +180,6 @@ private:
 	static size_t constexpr confirmed_frontiers_max_pending_cut_off{ 1000 };
 	nano::gap_cache::ordered_gaps inactive_votes_cache;
 	static size_t constexpr inactive_votes_cache_max{ 16 * 1024 };
-	// clang-format off
-	boost::multi_index_container<nano::election_timepoint,
-	mi::indexed_by<
-		mi::sequenced<mi::tag<tag_sequence>>,
-		mi::hashed_unique<mi::tag<tag_root>,
-			mi::member<nano::election_timepoint, nano::qualified_root, &nano::election_timepoint::root>>>>
-	dropped_elections_cache;
-	// clang-format on
-	static size_t constexpr dropped_elections_cache_max{ 32 * 1024 };
 	boost::thread thread;
 
 	friend class confirmation_height_prioritize_frontiers_Test;
