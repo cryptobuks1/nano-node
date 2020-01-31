@@ -566,9 +566,11 @@ TEST (active_transactions, update_difficulty)
 			ASSERT_NE (existing3, node2.active.roots.end ());
 			auto const existing4 (node2.active.roots.find (send2->qualified_root ()));
 			ASSERT_NE (existing4, node2.active.roots.end ());
-			auto updated = (existing1->difficulty > difficulty1) && (existing2->difficulty > difficulty2);
-			auto propogated = (existing3->difficulty > difficulty1) && (existing4->difficulty > difficulty2);
-			done = updated && propogated;
+			auto updated1 = existing1->difficulty > difficulty1;
+			auto updated2 = existing2->difficulty > difficulty2;
+			auto propogated1 = existing3->difficulty > difficulty1;
+			auto propogated2 = existing4->difficulty > difficulty2;
+			done = updated1 && updated2 && propogated1 && propogated2;
 		}
 		ASSERT_NO_ERROR (system.poll ());
 	}

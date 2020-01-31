@@ -86,7 +86,8 @@ public:
 	// Is the root of this block in the roots container
 	bool active (nano::block const &);
 	bool active (nano::qualified_root const &);
-	void update_difficulty (std::shared_ptr<nano::block>, boost::optional<nano::write_transaction const &> = boost::none);
+	std::shared_ptr<nano::election> election (nano::qualified_root const &) const;
+	void update_difficulty (std::shared_ptr<nano::block>);
 	void adjust_difficulty (nano::block_hash const &);
 	void update_active_difficulty (nano::unique_lock<std::mutex> &);
 	uint64_t active_difficulty ();
@@ -117,7 +118,7 @@ public:
 	nano::gap_information find_inactive_votes_cache (nano::block_hash const &);
 	void erase_inactive_votes_cache (nano::block_hash const &);
 	nano::node & node;
-	std::mutex mutex;
+	mutable std::mutex mutex;
 	boost::circular_buffer<double> multipliers_cb;
 	uint64_t trended_active_difficulty;
 	size_t priority_cementable_frontiers_size ();
@@ -151,8 +152,6 @@ private:
 	std::chrono::seconds const election_time_to_live;
 	// Minimum time between confirmation requests for an election
 	std::chrono::milliseconds const min_time_between_requests;
-	// Minimum time between broadcasts of the current winner of an election, as a backup to requesting confirmations
-	std::chrono::milliseconds const min_time_between_floods;
 	// Minimum election request count to start broadcasting blocks, as a backup to requesting confirmations
 	size_t const min_request_count_flood;
 
