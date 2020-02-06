@@ -26,12 +26,6 @@ last_broadcast (std::chrono::steady_clock::now ())
 	update_dependent ();
 }
 
-nano::election::~election ()
-{
-	clear_blocks ();
-	clear_dependent ();
-}
-
 void nano::election::confirm_once (nano::election_status_type type_a)
 {
 	assert (!node.active.mutex.try_lock ());

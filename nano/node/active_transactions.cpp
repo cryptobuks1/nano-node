@@ -241,6 +241,8 @@ void nano::active_transactions::request_confirm (nano::unique_lock<std::mutex> &
 		auto & election_l (i->election);
 		if ((count_l >= node.config.active_elections_size && !node.wallets.watcher->is_watched (i->root)) || election_l->transition_time (transaction_l))
 		{
+			election_l->clear_blocks ();
+			election_l->clear_dependent ();
 			i = sorted_roots_l.erase (i);
 		}
 		else
