@@ -205,7 +205,6 @@ void nano::active_transactions::request_confirm (nano::unique_lock<std::mutex> &
 {
 	assert (!mutex.try_lock ());
 	auto transaction_l (node.store.tx_begin_read ());
-	std::unordered_set<nano::qualified_root> inactive_l;
 	/*
 	 * Confirm frontiers when there aren't many confirmations already pending and node finished initial bootstrap
 	 * In auto mode start confirm only if node contains almost principal representative (half of required for principal weight)
@@ -223,9 +222,6 @@ void nano::active_transactions::request_confirm (nano::unique_lock<std::mutex> &
 			lock_a.lock ();
 		}
 	}
-	auto const now (std::chrono::steady_clock::now ());
-	// The lowest PoW difficulty elections have a maximum time to live if they are beyond the soft threshold size for the container
-	auto election_ttl_cutoff_l (now - election_time_to_live);
 
 	auto & sorted_roots_l = roots.get<tag_difficulty> ();
 	size_t count_l{ 0 };
@@ -240,33 +236,23 @@ void nano::active_transactions::request_confirm (nano::unique_lock<std::mutex> &
 	 * Elections extending the soft config.active_elections_size limit are flushed after a certain time-to-live cutoff
 	 * Flushed elections are later re-activated via frontier confirmation
 	 */
-	for (auto i = sorted_roots_l.begin (), n = sorted_roots_l.end (); i != n; ++i, ++count_l)
+	for (auto i = sorted_roots_l.begin (), n = sorted_roots_l.end (); i != n; ++count_l)
 	{
-		auto election_l (i->election);
-		auto root_l (i->root);
-		if (count_l >= node.config.active_elections_size && !node.wallets.watcher->is_watched (root_l))
+		auto & election_l (i->election);
+		if ((count_l >= node.config.active_elections_size && !node.wallets.watcher->is_watched (i->root)) || election_l->transition_time (transaction_l))
 		{
-			inactive_l.insert (root_l);
+			election_l->clear_blocks ();
+			election_l->clear_dependent ();
+			i = sorted_roots_l.erase (i);
 		}
-		else if (election_l->transition_time (transaction_l))
+		else
 		{
-			inactive_l.insert (root_l);
+			++i;
 		}
 	}
 	lock_a.unlock ();
 	solicitor.flush ();
 	lock_a.lock ();
-	// Erase inactive elections
-	for (auto i (inactive_l.begin ()), n (inactive_l.end ()); i != n; ++i)
-	{
-		auto root_it (roots.get<tag_root> ().find (*i));
-		if (root_it != roots.get<tag_root> ().end ())
-		{
-			root_it->election->clear_blocks ();
-			root_it->election->clear_dependent ();
-			roots.get<tag_root> ().erase (root_it);
-		}
-	}
 }
 
 void nano::active_transactions::request_loop ()
