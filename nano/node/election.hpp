@@ -53,7 +53,7 @@ class election final : public std::enable_shared_from_this<nano::election>
 	// Minimum time between broadcasts of the current winner of an election, as a backup to requesting confirmations
 	std::chrono::milliseconds const min_time_between_floods;
 	std::function<void(std::shared_ptr<nano::block>)> confirmation_action;
-	
+
 private: // State management
 	enum class state_t
 	{
@@ -86,14 +86,14 @@ public:
 	void clear_dependent ();
 	void clear_blocks ();
 	void insert_inactive_votes_cache (nano::block_hash const &);
-	
+
 public: // State transitions
 	bool transition_time (nano::transaction const &);
 	void transition_passive ();
 	void transition_active ();
 	void transition_idle ();
 	bool idle () const;
-	
+
 public:
 	bool confirmed ();
 	nano::node & node;
