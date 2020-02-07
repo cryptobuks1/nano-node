@@ -1761,7 +1761,7 @@ void nano::json_handler::confirmation_active ()
 
 void nano::json_handler::confirmation_height_currently_processing ()
 {
-	auto hash = node.pending_confirmation_height.current ();
+	auto hash = node.confirmation_height_processor.current ();
 	if (!hash.is_zero ())
 	{
 		response_l.put ("hash", hash.to_string ());
@@ -2295,8 +2295,7 @@ void nano::json_handler::frontiers ()
 
 void nano::json_handler::account_count ()
 {
-	auto transaction (node.store.tx_begin_read ());
-	auto size (node.store.account_count (transaction));
+	auto size (node.ledger.cache.account_count.load ());
 	response_l.put ("count", std::to_string (size));
 	response_errors ();
 }
@@ -4215,7 +4214,7 @@ void nano::json_handler::version ()
 	response_l.put ("node_vendor", boost::str (boost::format ("Nano %1%") % NANO_VERSION_STRING));
 	response_l.put ("store_vendor", node.store.vendor_get ());
 	response_l.put ("network", node.network_params.network.get_current_network_as_string ());
-	response_l.put ("network_identifier", nano::genesis ().hash ().to_string ());
+	response_l.put ("network_identifier", node.network_params.ledger.genesis_hash.to_string ());
 	response_l.put ("build_info", BUILD_INFO);
 	response_errors ();
 }
